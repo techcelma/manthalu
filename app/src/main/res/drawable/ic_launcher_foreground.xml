@@ -4,11 +4,23 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Simple geometric mark – replace with your own icon -->
+    <!-- A luminous M monogram framed by an orbit: the Manthalu assistant mark. -->
     <path
-        android:fillColor="#8B5CF6"
-        android:pathData="M54,30 L70,54 L54,78 L38,54 Z" />
+        android:fillColor="#00000000"
+        android:pathData="M54,20 A34,34 0,1 1,53.9 20"
+        android:strokeColor="#5266A8"
+        android:strokeWidth="2.5" />
     <path
-        android:fillColor="#22D3EE"
-        android:pathData="M54,42 L62,54 L54,66 L46,54 Z" />
+        android:fillColor="#00000000"
+        android:pathData="M31,72 L31,43 C31,37 37,36 41,41 L54,58 L67,41 C71,36 77,37 77,43 L77,72"
+        android:strokeColor="#72F0D5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="7" />
+    <path
+        android:fillColor="#FFD37A"
+        android:pathData="M77,25 L80,32 L87,35 L80,38 L77,45 L74,38 L67,35 L74,32 Z" />
+    <path
+        android:fillColor="#A99AFF"
+        android:pathData="M54,68 A4,4 0,1 1,54 76 A4,4 0,1 1,54 68" />
 </vector>
