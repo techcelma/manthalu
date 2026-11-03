@@ -14,3 +14,6 @@ dependencyResolutionManagement {
         maven("https://jitpack.io")
     }
 }
+
+rootProject.name = "manthalu"
+include(":app")
