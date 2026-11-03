@@ -1,5 +1,6 @@
 package com.manthalu.ai.navigation
 
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.isImeVisible
@@ -44,6 +45,7 @@ private val bottomNavItems = listOf(
     BottomNavItem(NavRoutes.Chat.route, "Chat", Icons.Filled.AutoAwesome, Icons.Outlined.AutoAwesome)
 )
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ManthaluNavHost() {
     val navController = rememberNavController()
