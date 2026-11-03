@@ -11,6 +11,7 @@ import com.manthalu.ai.data.model.MessageRole
 import com.manthalu.ai.data.remote.GeminiClient
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.time.Instant
 import java.util.UUID
 
 class ChatRepository(context: Context) {
@@ -29,7 +30,7 @@ class ChatRepository(context: Context) {
                     role = if (it.role == "user") MessageRole.USER else MessageRole.ASSISTANT,
                     content = it.content,
                     model = it.model,
-                    createdAt = java.time.Instant.ofEpochMilli(it.createdAt)
+                    createdAt = Instant.ofEpochMilli(it.createdAt)
                 )
             }
         }
@@ -38,49 +39,47 @@ class ChatRepository(context: Context) {
         val id = UUID.randomUUID().toString()
         val now = System.currentTimeMillis()
         db.conversationDao().upsert(
-            ConversationEntity(
-                id = id,
-                title = null,
-                mode = mode.systemKey,
-                createdAt = now,
-                updatedAt = now
-            )
+            ConversationEntity(id = id, title = null, mode = mode.systemKey, createdAt = now, updatedAt = now)
         )
         return id
+    }
+
+    suspend fun updateConversationMode(conversationId: String, mode: AiMode) {
+        val conversation = db.conversationDao().getById(conversationId) ?: return
+        db.conversationDao().upsert(conversation.copy(mode = mode.systemKey, updatedAt = System.currentTimeMillis()))
     }
 
     suspend fun sendMessage(
         conversationId: String,
         userText: String,
-        mode: AiMode
+        mode: AiMode,
+        attachmentContext: String? = null
     ): Result<String> {
         val now = System.currentTimeMillis()
-
-        // Persist user message
+        val attachmentLabel = attachmentContext?.substringBefore("\n")?.takeIf { it.isNotBlank() }
+        val savedUserText = if (attachmentLabel != null) "$userText\n\n[Attached file: $attachmentLabel]" else userText
         db.messageDao().insert(
             MessageEntity(
                 id = UUID.randomUUID().toString(),
                 conversationId = conversationId,
                 role = "user",
-                content = userText,
+                content = savedUserText,
                 createdAt = now
             )
         )
 
-        // Short conversation history
+        // The current turn is passed separately; only send earlier turns as history.
         val history = db.messageDao().getForConversation(conversationId)
-            .map { it.role to it.content }
+            .dropLast(1)
+            .takeLast(24)
+            .map { it.role to it.content.take(6_000) }
 
-        // Pull relevant memories (simple keyword + importance ranking)
-        val relevantMemories = if (config.memoryEnabled) {
-            selectRelevantMemories(userText)
-        } else {
-            emptyList()
-        }
+        val relevantMemories = if (config.memoryEnabled) selectRelevantMemories(userText) else emptyList()
+        val prompt = if (attachmentContext.isNullOrBlank()) userText else
+            "$userText\n\n--- Attached file context ---\n$attachmentContext\n--- End attached file context ---"
 
-        // Call Gemini with memories injected into system prompt
         val result = gemini.generate(
-            userMessage = userText,
+            userMessage = prompt,
             mode = mode,
             conversationHistory = history,
             relevantMemories = relevantMemories
@@ -100,55 +99,31 @@ class ChatRepository(context: Context) {
             val conv = db.conversationDao().getById(conversationId)
             if (conv != null && conv.title.isNullOrBlank()) {
                 val title = userText.take(48).let { if (userText.length > 48) "$it…" else it }
-                db.conversationDao().upsert(conv.copy(title = title, updatedAt = System.currentTimeMillis()))
+                db.conversationDao().upsert(conv.copy(title = title, mode = mode.systemKey, updatedAt = System.currentTimeMillis()))
             } else {
                 db.conversationDao().touch(conversationId, System.currentTimeMillis())
+                updateConversationMode(conversationId, mode)
             }
         }
-
         return result
     }
 
-    /**
-     * Very simple relevance: prefer pinned + high-importance memories whose
-     * content shares words with the user message. Good enough for personal use.
-     */
+    /** Rank approved memories by relevance first, then by pin and importance. */
     private suspend fun selectRelevantMemories(userText: String): List<String> {
-        val all = try {
-            // Use search with a broad query then rank
-            val words = userText.lowercase()
-                .split(Regex("\\W+"))
-                .filter { it.length > 3 }
-                .distinct()
-                .take(6)
-
-            if (words.isEmpty()) {
-                db.memoryDao().observeAll() // fallback not ideal in suspend; use search
-                emptyList()
-            } else {
-                // Pull all and rank in memory (personal collections stay small)
-                val entities = db.memoryDao().search(words.first())
-                // Also try other words and merge
-                val extra = words.drop(1).flatMap { w ->
-                    try { db.memoryDao().search(w) } catch (_: Exception) { emptyList() }
-                }
-                (entities + extra).distinctBy { it.id }
-            }
-        } catch (_: Exception) {
-            emptyList()
-        }
-
-        val candidates = if (all.isEmpty()) {
-            try { db.memoryDao().getAllOnce() } catch (_: Exception) { emptyList() }
-        } else all
-
+        val candidates = try { db.memoryDao().getAllOnce() } catch (_: Exception) { emptyList() }
+        val terms = userText.lowercase().split(Regex("\\W+")).filter { it.length > 2 }.toSet()
         return candidates
             .sortedWith(
-                compareByDescending<com.manthalu.ai.data.local.MemoryEntity> { it.isPinned }
+                compareByDescending<com.manthalu.ai.data.local.MemoryEntity> { memory ->
+                    val words = (memory.content + " " + memory.category).lowercase()
+                        .split(Regex("\\W+")).filter { it.length > 2 }.toSet()
+                    terms.intersect(words).size
+                }
+                    .thenByDescending { it.isPinned }
                     .thenByDescending { it.importance }
                     .thenByDescending { it.updatedAt }
             )
-            .take(8)
+            .take(10)
             .map { it.content }
     }
 
