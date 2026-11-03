@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Manthalu AI</string>
+    <string name="home_greeting">Good evening</string>
+    <string name="ask_placeholder">Ask Manthalu anything…</string>
+</resources>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Simple geometric mark – replace with your own icon -->
+    <path
+        android:fillColor="#8B5CF6"
+        android:pathData="M54,30 L70,54 L54,78 L38,54 Z" />
+    <path
+        android:fillColor="#22D3EE"
+        android:pathData="M54,42 L62,54 L54,66 L46,54 Z" />
+</vector>
